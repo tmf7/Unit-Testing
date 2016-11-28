@@ -14,31 +14,39 @@
 int GUID = 0;		
 
 typedef struct T_s {
-	const char * value;
+	const int value;
 	int id;
 
-	T_s(const char * value) : value(value), id(GUID++) {
-		printf("CONSTRUCT\t(GUID %i): %s\tat address %p\n\n", id, this->value, &(this->value)); 
+	T_s(const int && value) : value(std::move(value)), id(GUID++) {
+		printf("MOVE CONSTRUCT\t(GUID %i): %i\tat address %p\n\n", id, this->value, &(this->value));
+	};
+
+	T_s(const int & value) : value(value), id(GUID++) {
+		printf("COPY CONSTRUCT\t(GUID %i): %i\tat address %p\n\n", id, this->value, &(this->value)); 
 	};
 
 	~T_s() { 
-		printf("DESTRUCT\t(GUID %i): %s\tat address %p\n\n", id, this->value, &(this->value)); 
+		printf("DESTRUCT\t(GUID %i): %i\tat address %p\n\n", id, this->value, &(this->value)); 
 	};
 } T;
 
 void DestructorTest() {
+	T lValue{ 10 };
+	// default construction of T, copy constructon of unique_ptr (or something)
+	std::unique_ptr<T> D(std::make_unique<T>(lValue));
+	printf("D->value ==\t(GUID %i): %i\tat address %p\n\n", D->id, D->value, &(D->value));
 
 	// default construction of T, copy constructon of unique_ptr (or something)
-	std::unique_ptr<T> A(new T("ctor"));		
-	printf("A->value ==\t(GUID %i): %s\tat address %p\n\n", A->id, A->value, &(A->value));
+	std::unique_ptr<T> A(new T(0));		
+	printf("A->value ==\t(GUID %i): %i\tat address %p\n\n", A->id, A->value, &(A->value));
 
 	// default construction of T, copy construction of unique_ptr
-	std::unique_ptr<T> B = std::make_unique<T>(T("cctor"));		
-	printf("B->value ==\t(GUID %i): %s\tat address %p\n\n", B->id, B->value, &(B->value));
+	std::unique_ptr<T> B = std::make_unique<T>(T(1));		
+	printf("B->value ==\t(GUID %i): %i\tat address %p\n\n", B->id, B->value, &(B->value));
 
 	// default construction of T, move assignemnt of unique_ptr
-	B = std::make_unique<T>(T("move")); 
-	printf("B->value ==\t(GUID %i): %s\tat address %p\n\n", B->id, B->value, &(B->value));
+	B = std::make_unique<T>(T(2)); 
+	printf("B->value ==\t(GUID %i): %i\tat address %p\n\n", B->id, B->value, &(B->value));
 }
 // END TEST
 /////////////////////////////////////////////////////////////////////////
@@ -217,7 +225,7 @@ int main() {
 	PrintDeque(G, "G result");
 // END eNode move semantics testing
 /////////////////////////////////////
-//	DestructorTest();
+	DestructorTest();
 /**/
 	printf("END eNODE COPY TESTS\n\n");
 	return 0;
