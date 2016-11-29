@@ -3,10 +3,9 @@
 
 #include <new.h>		// std::move
 #include <utility>		// std::swap
-//#include <math.h>		// floorf
 
-#define DEFAULT_HEAP_SIZE 2
-#define DEFAULT_HEAP_GRANULARITY 2
+#define DEFAULT_HEAP_SIZE 1024
+#define DEFAULT_HEAP_GRANULARITY 1024
 
 
 // TODO: use lazy deletion for IncreaseKey/DecreaseKey: insert new data at the bottom and heapify, as well as
@@ -27,51 +26,68 @@
 // AND after its list of best waypoints has been pushed onto a bestPath deque
 
 // TODO (eDeque/eHeap): add "noexcept" after all functions that use std::swap (move semantics exception safety guarantee)
-// TODO: abstract this for inheritance, then have each derived class define a comparison method? (see doom queue code)
 // DEBUG: the template compare function a user creates dictates if this is a MaxHeap or a MinHeap
 // DEBUG: this heap contains copies of the source data, thus changing the source data will not affect this heap and vis vesa
+// TODO: fix function header comments
 template <class type, class lambdaCompare>
-class eHeap {			// TODO: include granularity for resizing? (like dooms HashIndex class)
-public:						// otherwise put protocols for overfill
+class eHeap {
+public:
 
-							eHeap(lambdaCompare && compare);			// create heap (empty)
-//							eHeap(const type * data);					// heapify constructor
-//							eHeap(const eHeap<type, compare> & other);	// copy constructor
-//							eHeap(eHeap<type, compare> && other);		// move constructor
-							~eHeap();									// destructor
+	typedef eHeap<type, lambdaCompare> heap_t;
+
+							eHeap() = delete;									// relaced default constructor
+							eHeap(lambdaCompare compare, const int initialHeapSize = DEFAULT_HEAP_SIZE);
+
+//							eHeap(const type * data);							// heapify copy constructor
+							eHeap(const eHeap<type, lambdaCompare> & other);	// copy constructor
+							eHeap(eHeap<type, lambdaCompare> && other);			// move constructor
+							~eHeap();											// destructor
+
+	heap_t &				operator=(eHeap<type, lambdaCompare> other);		// copy and swap assignement
+//	heap_t					operator+(const eHeap & one, const eHeap & two);	// global merge returns a new heap (move this out of class declaration)
+//	heap_t &				operator+=(const eHeap other);						// class meld returns *this changed heap (uses copy-and-swap idiom to use move or copy semantics with one function call)
+	const type * const		operator[](const int index) const;					// DEBUG: to print the heap contents in arbirary order
 
 	const type * const		PeekRoot() const;
-	void					PushHeap(const type & data);				// push to the next available child slot, then SiftUp
-//	void					PushHeap(type && data);						// move semantics Insert
+	void					PushHeap(const type & data);
+	void					PushHeap(type && data);
 	void					PopRoot();
-//	type					ExtractRoot();								// returns a copy of the root, deletes the root (possible copy exceptions)
 	void					ReplaceRoot(const type & data);
-//	void					ReplaceRoot(type && data);					// move semantics ReplaceRoot
+	void					ReplaceRoot(type && data);
+//	type					ExtractRoot();										// returns a copy of the root, deletes the root (possible copy exceptions)
 
-//	const type &			FindKey(const int index) const;					// return a specific value (search by index)
-//	const type &			FindKey(const type & data) const;				// return a specific value (searh by value) ???
-//	void					Delete(const int index);						// remove an arbitrary node, move the last node there, then SiftUp or SiftDown
-//	void					IncreaseKey(const int index, const type & newKey);		// modfy a specific key/index
-//	void					DecreaseKey(const int index, const type & newKey);		// ditto
+/*
+	// TODO: potentially template these search functions to take 
+	// a different data type that'll be searched by,
+	// which should be part of a larger type (eg: test_t::id, test_t::value, test_t::priority, etc)
+	// DEBUG: these would be universal references (forwarding references)
+	template<typename dataMember>
+	bool					FindKey(dataMember && key, type & result) const;	// determine if the key is in the heap
+																				// FIXME/BUG: this assumes that the complete data spec is known, 
+																				// but what if just a key is known (eg "graphics/door.bmp") which 
+	template<typename dataMember>												// will return the complete data spec (via the partial spec)
+	bool					Delete(dataMember && key);							// remove an arbitrary node (same FIXME as FindKey)
 
-//	static void				Heapify(type * data);							// arrange the elements of the given array into a binary heap order (for heapsort)
-//	static eHeap<type, lambdaCompare>		Merge(const eHeap<type, lambdaCompare> & a, const eHeap<type, lambdaCompare> & b);	// make a new heap preserve original heaps
-//	eHeap<type> &			Meld(eHeap<type, lambdaCompare> & other);		// create a heap from the two, destroy the old
-//	eHeap<type> &			Meld(eHeap<type, lambdaCompare> && other);		// create a heap from the two, destroy the old (move semantics)
+	template<typename dataMember>
+	void					ReplaceKey(dataMember && oldKey, dataMember && newKey);	// replace an arbitrary key (then if (compare('parent', 'newKey')){ SiftUp(index); } else { SiftDown(index); })
+																				// DEBUG: current intention to use "lazy" deletion where the 
+																				// newKey is just pushed and the oldKey is marked and poped 
+*/																				// when it reaches the top 
+//	void					Heapify(type * data);								// global heapify (do not make a copy?) (move this out of class declaration)
 
 	int						Size() const;
 	bool					IsEmpty() const;
 
-	size_t					Allocated() const;							// TODO: test
-	void					SetGranularity(const int newGranularity);	// TODO: test
+	// memory management
+	size_t					Allocated() const;
+	void					SetGranularity(const int newGranularity);
 	void					Free();
-	void					Resize(const int newHeapSize);				// TODO: test
+	void					Resize(const int newHeapSize);
 	void					Clear();
-	void					ClearAndResize(const int newHeapSize);		// TODO: test
+	void					ClearAndResize(const int newHeapSize);
 
 private:
 	
-	void					Init(const int initialHeapSize);
 	void					Allocate(const int newHeapSize);
 	void					SiftUp(const int index);
 	void					SiftDown(const int index);
@@ -87,29 +103,68 @@ private:
 
 // default constructor, doesn't allocate until the first insert
 template<class type, class lambdaCompare>
-inline eHeap<type, lambdaCompare>::eHeap(lambdaCompare && compare) : compare(std::move(compare)) {
-	Init(DEFAULT_HEAP_SIZE);
+inline eHeap<type, lambdaCompare>::eHeap(lambdaCompare compare, const int initialHeapSize) 
+	: compare(compare),
+	  numElements(0),
+	  granularity(DEFAULT_HEAP_GRANULARITY),
+	  heapSize(initialHeapSize),
+	  heap(nullptr) {
 }
 
 /*
 // FIXME: this has no way of knowing how big the given data set is
 template<class type, class lambdaCompare>
 inline eHeap<type, lambdaCompare>::eHeap(const type * data) {
-	// TODO: if this were to do a swap of the data pointer (assumed head of a c-style array)
+	// TODO: if this were to do a swap of the data pointer (**assumed** head of a c-style array)
 	// then that wouldn't guarantee that the old array would be freed properly...itd be the users responsibility
 	// though that isn't obvious
 }
+*/
 
 // copy constructor
 template<class type, class lambdaCompare>
-inline eHeap<type, lambdaCompare>::eHeap(const eHeap<type, lambdaCompare> & other) {
+inline eHeap<type, lambdaCompare>::eHeap(const eHeap<type, lambdaCompare> & other) 
+	: compare(other.compare),
+	  numElements(other.numElements),
+	  granularity(other.granularity),
+	  heapSize(other.heapSize) 
+{
+	heap = new type[heapSize];
+	memcpy(heap, other.heap, other.heapSize * sizeof(other.heap[0]));
 }
 
 // move constructor
-template<class type, class compare>
-inline eHeap<type, lambdaCompare>::eHeap(eHeap<type, lambdaCompare> && other) {
+template<class type, class lambdaCompare>
+inline eHeap<type, lambdaCompare>::eHeap(eHeap<type, lambdaCompare> && other) 
+	: compare(other.compare),
+	  numElements(0),
+	  granularity(0),
+	  heapSize(0),
+	  heap(nullptr) 
+{
+	std::swap(numElements, other.numElements);
+	std::swap(granularity, other.granularity);
+	std::swap(heapSize, other.heapSize);
+	std::swap(heap, other.heap);
 }
-*/
+
+// copy and swap assignement
+template<class type, class lambdaCompare>
+inline eHeap<type, lambdaCompare> & eHeap<type, lambdaCompare>::operator=(eHeap<type, lambdaCompare> other) {
+	std::swap(numElements, other.numElements);
+	std::swap(granularity, other.granularity);
+	std::swap(heapSize, other.heapSize);
+	std::swap(heap, other.heap);
+	// DEBUG: compare closure swap omitted because both eHeaps already contain the relevant instance,
+	// as well as to avoid invoking deleted default lambda constructor
+	return *this;
+}
+
+// arbitrary indexing operator
+template<class type, class lambdaCompare>
+inline const type * const eHeap<type, lambdaCompare>::operator[](const int index) const {
+	return (heap == nullptr || index >= numElements || index < 0) ? nullptr : &heap[index];
+}
 
 // destructor
 template<class type, class lambdaCompare>
@@ -136,20 +191,19 @@ inline void eHeap<type, lambdaCompare>::PushHeap(const type & data) {
 	numElements++;
 }
 
-/*
 // emplace and move push
 // FIXME/BUG: this assumes the template type has a proper move assignment operator
 template<class type, class lambdaCompare>
-inline void eHeap<type, lambdaCompare>::PushHeap(const type && data) {
+inline void eHeap<type, lambdaCompare>::PushHeap(type && data) {
 	if (heap == nullptr)
 		Allocate(heapSize);
 	else if (numElements + 1 >= heapSize)
 		Resize(heapSize + 1);
 
-	heap[numElements++] = std::move(data);
+	heap[numElements] = std::move(data);
 	SiftUp(numElements);
+	numElements++;
 }
-*/
 
 // pop
 template<class type, class lambdaCompare>
@@ -176,19 +230,18 @@ inline void eHeap<type, lambdaCompare>::ReplaceRoot(const type & data) {
 	SiftDown(0);
 }
 
-/*
 // emplace and move replace
-// FIXME/BUG: this assumes the template type has a move assignment operator
+// FIXME/BUG: this assumes the template type has a move assignment operator (default or otherwise)
 template<class type, class lambdaCompare>
-inline void eHeap<type, lambdaCompare>::ReplaceRoot(const type && data) {
+inline void eHeap<type, lambdaCompare>::ReplaceRoot(type && data) {
 	if (heap == nullptr) {
-		PushHeap(data);
+		PushHeap(std::move(data));
 		return;
 	}
 	heap[0] = std::move(data);
 	SiftDown(0);
 }
-*/
+
 
 // size
 template<class type, class lambdaCompare>
@@ -259,22 +312,13 @@ inline void eHeap<type, lambdaCompare>::SiftDown(const int index) {
 	}
 }
 
-
-/////////////////////////////////////////////////////////////////////////////
-template<class type, class lambdaCompare>
-inline void eHeap<type, lambdaCompare>::Init(const int initialHeapSize) {
-	heapSize = initialHeapSize;
-	heap = nullptr;
-	granularity = DEFAULT_HEAP_GRANULARITY;
-}
-
 // Allocate
 template<class type, class lambdaCompare>
 inline void eHeap<type, lambdaCompare>::Allocate(const int newHeapSize) {
 	Free();
 	heapSize = newHeapSize;
-	heap = new type[heapSize];
-	memset(heap, 0, heapSize * sizeof(heap[0]));
+	heap = new type[heapSize];					// FIXME/BUG: sizeof(type) may change (as bug below using an instance std::string)
+	memset(heap, 0, heapSize * sizeof(heap[0]));// FIXME/BUG: same problem here
 }
 
 // Allocated
@@ -318,9 +362,9 @@ inline void eHeap<type, lambdaCompare>::Resize(const int newHeapSize) {
 	}
 
 	oldHeap = heap;
-	heap = new type[newSize];
-	memcpy(heap, oldHeap, heapSize * sizeof(heap[0]));
-	memset(heap + heapSize, 0, (newSize - heapSize) * sizeof(heap[0]));
+	heap = new type[newSize];	// FIXME/BUG: sizeof(type) for a given instance could vary for example if it contains std::string longer than std::string's basic 28 byte allocation (24 characters)
+	memcpy(heap, oldHeap, heapSize * sizeof(type));						// FIXME/BUG: same problem here
+	memset(heap + heapSize, 0, (newSize - heapSize) * sizeof(type));	// FIXME/BUG: and here
 	delete[] oldHeap;
 	heapSize = newSize;
 }
