@@ -19,9 +19,10 @@ typedef struct test_s {
 // use a lambda function to define the comparison used by the template
 // every lambda closure has a unique type, regardless of content
 // only swaps if greater (not if equal) to generate a MaxHeap (simply reverse for MinHeap)
-auto max = [](test_t a, test_t b) { return b.priority > a.priority; };
-//	auto dupe = [](test_t a, test_t b) { return b.priority > a.priority; };
-//	auto min = [](test_t a, test_t b) { return b.priority < a.priority; };
+auto max = [](test_t & a, test_t & b) { return b.priority > a.priority; };
+//	auto copy = max;	// works in place of max for template type definition and instance copy
+//	auto dupe = [](test_t a, test_t b) { return b.priority > a.priority; }; // doesn't work in place of max
+//	auto min = [](test_t a, test_t b) { return b.priority < a.priority; };	// ditto
 
 void PrintHeap(eHeap<test_t, decltype(max)> & heap) {
 	int i;
@@ -63,6 +64,13 @@ int main() {
 
 	FillHeapWithInts(first, 10, 26, false);
 
+	test_t * result;
+	auto eqls = [](test_t & a, int b) { return a.id == b; };
+	if (first.FindByKey(7, eqls, &result))
+//		printf("\n\nFound test_t (GUID 7)");	// for result == nullptr test: worked
+		printf("\n\nFound test_t (GUID 7): {%i\t%i\t%i}\n\n", result->priority, result->id, result->value);
+
+
 //	eHeap<test_t, decltype(max)> second = first;			// copy ctor: works
 //	eHeap<test_t, decltype(max)> second = std::move(first);	// move ctor: works
 //	first.~eHeap();											// moved out of an lvalue, destroy it
@@ -80,6 +88,13 @@ int main() {
 
 	PrintHeap(first);
 	PrintHeap(second);
+
+	// TODO (testing):
+	// global heapify
+	// heapify copy ctor
+	// removebykey
+	// replacebykey (copy)
+	// replacebykey (move)
 
 	while(!second.IsEmpty()) {
 		printf("Top (Priority, GUID, Value): %i, %i, %i\nRoot Popped\n\n", second.PeekRoot()->priority, second.PeekRoot()->id, second.PeekRoot()->value);

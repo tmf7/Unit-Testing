@@ -29,6 +29,11 @@
 // DEBUG: the template compare function a user creates dictates if this is a MaxHeap or a MinHeap
 // DEBUG: this heap contains copies of the source data, thus changing the source data will not affect this heap and vis vesa
 // TODO: fix function header comments
+
+// file-scoped 
+//static auto default_max = [](auto parent, auto child) { return parent > child;  };
+
+
 template <class type, class lambdaCompare>
 class eHeap {
 public:
@@ -36,9 +41,11 @@ public:
 	typedef eHeap<type, lambdaCompare> heap_t;
 
 							eHeap() = delete;									// relaced default constructor
-							eHeap(lambdaCompare compare, const int initialHeapSize = DEFAULT_HEAP_SIZE);
+							eHeap(lambdaCompare & compare, const int initialHeapSize = DEFAULT_HEAP_SIZE);
+																				// heapify copy constructor 
+																				// only works on contiguous memory
+							eHeap(lambdaCompare & comapre, const type * data, const int numElements);	
 
-//							eHeap(const type * data);							// heapify copy constructor
 							eHeap(const eHeap<type, lambdaCompare> & other);	// copy constructor
 							eHeap(eHeap<type, lambdaCompare> && other);			// move constructor
 							~eHeap();											// destructor
@@ -54,27 +61,22 @@ public:
 	void					PopRoot();
 	void					ReplaceRoot(const type & data);
 	void					ReplaceRoot(type && data);
-//	type					ExtractRoot();										// returns a copy of the root, deletes the root (possible copy exceptions)
+//	type					ExtractRoot();										// returns a copy of the root, 
+																				// "deletes" the root (possible copy exceptions)
 
-/*
-	// TODO: potentially template these search functions to take 
-	// a different data type that'll be searched by,
-	// which should be part of a larger type (eg: test_t::id, test_t::value, test_t::priority, etc)
-	// DEBUG: these would be universal references (forwarding references)
-	template<typename dataMember>
-	bool					FindKey(dataMember && key, type & result) const;	// determine if the key is in the heap
-																				// FIXME/BUG: this assumes that the complete data spec is known, 
-																				// but what if just a key is known (eg "graphics/door.bmp") which 
-	template<typename dataMember>												// will return the complete data spec (via the partial spec)
-	bool					Delete(dataMember && key);							// remove an arbitrary node (same FIXME as FindKey)
+	// DEBUG: universal/forwarding references
+	template<typename DataMember, typename lambdaEquals>
+	bool					FindByKey(DataMember && key, lambdaEquals & equals, type ** result);	
 
-	template<typename dataMember>
-	void					ReplaceKey(dataMember && oldKey, dataMember && newKey);	// replace an arbitrary key (then if (compare('parent', 'newKey')){ SiftUp(index); } else { SiftDown(index); })
-																				// DEBUG: current intention to use "lazy" deletion where the 
-																				// newKey is just pushed and the oldKey is marked and poped 
-*/																				// when it reaches the top 
-//	void					Heapify(type * data);								// global heapify (do not make a copy?) (move this out of class declaration)
+	template<typename DataMember, typename lambdaEquals>
+	bool					RemoveByKey(DataMember && key, lambdaEquals & equals);
 
+	template<typename DataMember, typename lambdaEquals>
+	bool					ReplaceByKey(DataMember && oldKey, type & newData, lambdaEquals & equals);
+
+	template<typename DataMember, typename lambdaEquals>
+	bool					ReplaceByKey(DataMember && oldKey, type && newData, lambdaEquals & equals);
+ 
 	int						Size() const;
 	bool					IsEmpty() const;
 
@@ -101,9 +103,41 @@ private:
 	int						heapSize;
 };
 
+// global heapify (doesn't copy data)
+// only works on contiguous memory
+template<class type, class lambdaCompare>
+inline void Heapify(const type * data, const int numElements, lambdaCompare & compare) {
+	int i;
+	int	parent;
+	int	child;
+
+	if (data  == nullptr || numElements <= 1)
+		return;
+
+	for (i = numElements / 2; i > 0; i--) {
+		for (parent = i - 1, child = 2 * parent + 1; child < numElements; child = 2 * parent + 1) {
+			if (child + 1 < numElements && compare(data[child], data[child + 1]))
+				child++;
+			if (!compare(data[parent], data[child]))
+				return;
+
+			std::swap(data[parent], data[child]);
+			parent = child;
+		}
+	}
+}
+
+template<class type, class lambdaCompare>
+inline void HeapSort(const type * data, const int numElements, lambdaCompare & compare) {
+	Heapify(data, numElements, compare);
+	// TODO: now do the heapsort proper here
+	// TODO: also implement mergesort for merging/melding two heaps via += or + (elsewhere?)
+}
+
+
 // default constructor, doesn't allocate until the first insert
 template<class type, class lambdaCompare>
-inline eHeap<type, lambdaCompare>::eHeap(lambdaCompare compare, const int initialHeapSize) 
+inline eHeap<type, lambdaCompare>::eHeap(lambdaCompare & compare, const int initialHeapSize) 
 	: compare(compare),
 	  numElements(0),
 	  granularity(DEFAULT_HEAP_GRANULARITY),
@@ -111,15 +145,30 @@ inline eHeap<type, lambdaCompare>::eHeap(lambdaCompare compare, const int initia
 	  heap(nullptr) {
 }
 
-/*
-// FIXME: this has no way of knowing how big the given data set is
+// heapify copy constructor
 template<class type, class lambdaCompare>
-inline eHeap<type, lambdaCompare>::eHeap(const type * data) {
-	// TODO: if this were to do a swap of the data pointer (**assumed** head of a c-style array)
-	// then that wouldn't guarantee that the old array would be freed properly...itd be the users responsibility
-	// though that isn't obvious
+inline eHeap<type, lambdaCompare>::eHeap(lambdaCompare & compare, const type * data, const int numElements) 
+	: compare(compare),
+	  numElements(numElements),
+	  granularity(DEFAULT_HEAP_GRANULARITY)
+{
+	int i;
+	int mod;
+
+	mod = numElements % granularity;
+	if (!mod)
+		heapSize = numElements;
+	else
+		heapSize = numElements + granularity - mod;
+
+	heap = new type[heapSize];
+	memcpy(heap, data, numElements * sizeof(data[0]));
+	memset(heap + numElements, 0, (heapSize - numElements) * sizeof(data[0]));
+	
+	// DEBUG: start at the element just above the last leaf child and work upwards
+	for (i = numElements / 2; i > 0; i--)
+		SiftDown(i - 1);
 }
-*/
 
 // copy constructor
 template<class type, class lambdaCompare>
@@ -242,6 +291,85 @@ inline void eHeap<type, lambdaCompare>::ReplaceRoot(type && data) {
 	SiftDown(0);
 }
 
+// FindByKey
+// DEBUG: search keys can differ from compare keys
+// points result to the first match regardless of duplicates
+// FIXME/BUG: potential copy exception (eg std::unique_ptr), 
+// but the goal is to return a modifiable value (hence the pointer to pointer)
+template<class type, class lambdaCompare>
+template<typename DataMember, typename lambdaEquals>
+inline bool eHeap<type, lambdaCompare>::FindByKey(DataMember && key, lambdaEquals & equals, type ** result) {
+	int i;
+
+	for (i = 0; i < numElements; i++) {
+		if (equals(heap[i], std::forward<DataMember>(key))) {
+			result == nullptr ? (void)0 : *result = &heap[i];
+			return true;
+		}
+	}
+	return false;
+}
+/////////////////////////////////////////////////
+// RemoveByKey
+// (swap the last node here and siftdown using numElements - 1)
+template<class type, class lambdaCompare>
+template<typename DataMember, typename lambdaEquals>
+inline bool eHeap<type, lambdaCompare>::RemoveByKey(DataMember && key, lambdaEquals & equals) {
+	int i;
+
+	for (i = 0; i < numElements; i++) {
+		if (equals(heap[i], std::forward<DataMember>(key))) {
+			heap[i] = std::move(heap[numElements - 1]);
+			numElements--;
+			SiftDown(i);
+			return true;
+		}
+	}
+	return false;
+}
+
+// ReplaceByKey
+template<class type, class lambdaCompare>
+template<typename DataMember, typename lambdaEquals>
+inline bool eHeap<type, lambdaCompare>::ReplaceByKey(DataMember && oldKey, type & newData, lambdaEquals & equals) {
+	int i;
+
+	for (i = 0; i < numElements; i++) {
+		if (equals(heap[i], std::forward<DataMember>(oldKey))) {
+			heap[i] = newData;
+
+			if (i > 0 && compare(heap[(i - 1) / 2], heap[i]))
+				SiftUp(i);
+			else
+				SiftDown(i);
+
+			return true;
+		}
+	}
+	return false;
+}
+
+// ReplaceByKey
+template<class type, class lambdaCompare>
+template<typename DataMember, typename lambdaEquals>
+inline bool eHeap<type, lambdaCompare>::ReplaceByKey(DataMember && oldKey, type && newData, lambdaEquals & equals) {
+	int i;
+
+	for (i = 0; i < numElements; i++) {
+		if (equals(heap[i], std::forward<DataMember>(oldKey))) {
+			heap[i] = std::move(newData);
+
+			if (i > 0 && compare(heap[(i - 1) / 2], heap[i]))
+				SiftUp(i);
+			else
+				SiftDown(i);
+
+			return true;
+		}
+	}
+	return false;
+}
+////////////////////////////////////////////////////////////////
 
 // size
 template<class type, class lambdaCompare>
@@ -264,15 +392,12 @@ inline void eHeap<type, lambdaCompare>::SiftUp(const int index) {
 	if (heap == nullptr)
 		return;
 
-	child = index;
-	while (child > 0) {
+	for (child = index; child > 0; child = parent) {
 		parent = (child - 1) / 2;
-		if (compare(heap[parent], heap[child])) {
-			std::swap(heap[parent], heap[child]);
-			child = parent;
-		} else {
-			break;
-		}
+		if (!compare(heap[parent], heap[child]))
+			return;
+
+		std::swap(heap[parent], heap[child]);
 	}
 }
 
@@ -280,35 +405,20 @@ inline void eHeap<type, lambdaCompare>::SiftUp(const int index) {
 template<class type, class lambdaCompare>
 inline void eHeap<type, lambdaCompare>::SiftDown(const int index) {
 	int		parent;
-	int		left;
-	int		right;
-	int		target;
-	bool	leftExists;
-	bool	rightExists;
+	int		child;
 
 	if (heap == nullptr || numElements <= 1)
 		return;
 
-	parent		= index;	
-	left		= 2 * parent + 1;
-	right		= 2 * parent + 2;
-	leftExists	= left < numElements;
-	rightExists = right < numElements;
-
-	// DEBUG: a right child's existance implies that a left child exists, but not vis versa
-	while (leftExists || rightExists) {
-
-		target = !rightExists || compare(heap[right], heap[left]) ? left : right;
-		if (compare(heap[parent], heap[target])) {
-			std::swap(heap[parent], heap[target]);
-			parent = target;
-		} else {
+	// DEBUG: a right child's existance (child + 1) implies that a left child exists, but not vis versa
+	for (parent = index, child = 2 * parent + 1; child < numElements; child = 2 * parent + 1) {
+		if (child + 1 < numElements && compare(heap[child], heap[child + 1]))
+			child++;
+		if (!compare(heap[parent], heap[child]))
 			return;
-		}
-		left		= 2 * parent + 1;
-		right		= 2 * parent + 2;
-		leftExists	= left < numElements;
-		rightExists = right < numElements;
+
+		std::swap(heap[parent], heap[child]);
+		parent = child;
 	}
 }
 
