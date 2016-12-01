@@ -59,15 +59,17 @@ void FillHeapWithInts(eHeap<test_t, decltype(max)> & heap, const int num, const 
 	delete[] lValues;
 }
 
+// unit test
+// all tests confirmed with POD types
+// TODO: test with std::string, and std::unique_ptr<int>
 int main() {
 	eHeap<test_t, decltype(max)> first(std::move(max));		// lvalue eHeap ("default" constructor)
 
-	FillHeapWithInts(first, 10, 26, false);
+	FillHeapWithInts(first, 10, 1, false);
 
-	test_t * result;
 	auto eqls = [](test_t & a, int b) { return a.id == b; };
-	if (first.FindByKey(7, eqls, &result))
-//		printf("\n\nFound test_t (GUID 7)");	// for result == nullptr test: worked
+	const test_t * result = first.FindByKey(7, eqls);
+	if (result != nullptr)
 		printf("\n\nFound test_t (GUID 7): {%i\t%i\t%i}\n\n", result->priority, result->id, result->value);
 
 
@@ -86,19 +88,28 @@ int main() {
 	test_t lValue{666,666};									// copy replaceroot: works
 	first.ReplaceRoot(lValue);
 
+	auto third = first + second;							// merge (heapify, heapify copy ctor): works
+
+	eHeap<test_t, decltype(max)> fourth(max);
+
+	fourth.PushHeap(test_t(456, 456));
+	fourth += third;										// meld: works
+
+	auto eqls2 = [](test_t & a, int b) { return a.value == b; };
+	fourth.RemoveByKey(666, eqls2);							// remove key: works
+
+	fourth.ReplaceByKey(5, -9, eqls);						// emplace replace: works
+	test_t lValue2{15, 777};
+	fourth.ReplaceByKey(7, lValue2, eqls);					// copy replace: works
+
 	PrintHeap(first);
 	PrintHeap(second);
+	PrintHeap(third);
+	PrintHeap(fourth);
 
-	// TODO (testing):
-	// global heapify
-	// heapify copy ctor
-	// removebykey
-	// replacebykey (copy)
-	// replacebykey (move)
-
-	while(!second.IsEmpty()) {
-		printf("Top (Priority, GUID, Value): %i, %i, %i\nRoot Popped\n\n", second.PeekRoot()->priority, second.PeekRoot()->id, second.PeekRoot()->value);
-		second.PopRoot();
+	while(!fourth.IsEmpty()) {
+		printf("Top (Priority, GUID, Value): %i, %i, %i\nRoot Popped\n\n", fourth.PeekRoot()->priority, fourth.PeekRoot()->id, fourth.PeekRoot()->value);
+		fourth.PopRoot();
 	}
 
 	return 0;
