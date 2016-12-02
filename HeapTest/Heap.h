@@ -35,8 +35,6 @@
 // This copies/moves pushed data, so changing 
 // the source data will not affect this heap.
 // This class only works with contiguous memory.
-// FIXME/BUG: sizeof(type) may change (eg: using a std::string longer than the default 28bytes),
-// which may cause read/write access errors. Potentially fixed via reasonably large block allocation
 //*******************************************
 template <class type, class lambdaCompare>
 class eHeap {
@@ -47,12 +45,15 @@ public:
 							eHeap() = delete;															// disallow instantiation without lambdaCompare object		
 							eHeap(lambdaCompare & compare, const int initialHeapSize = DEFAULT_HEAP_SIZE);// relaced default constructor
 							eHeap(lambdaCompare & compare, const type * data, const int numElements);	// heapify copy constructor 
+							eHeap(lambdaCompare & compare, type * data, const int numElements);			// heapify move constructor 
 							eHeap(const eHeap<type, lambdaCompare> & other);							// copy constructor
 							eHeap(eHeap<type, lambdaCompare> && other);									// move constructor
 							~eHeap();																	// destructor
 
-	heap_t					operator+(const eHeap<type, lambdaCompare> & other);						// merge
-	heap_t &				operator+=(const eHeap other);												// meld
+	heap_t					operator+(const eHeap<type, lambdaCompare> & other);						// copy merge
+	heap_t					operator+(eHeap<type, lambdaCompare> && other);								// move merge
+	heap_t &				operator+=(const eHeap<type, lambdaCompare> & other);						// copy meld
+	heap_t &				operator+=(eHeap<type, lambdaCompare> && other);							// move meld
 	heap_t &				operator=(eHeap<type, lambdaCompare> other);								// copy and swap assignement
 	const type * const		operator[](const int index) const;											// debug const content access	
 
@@ -129,6 +130,7 @@ inline eHeap<type, lambdaCompare>::eHeap(lambdaCompare & compare, const type * d
 	  granularity(DEFAULT_HEAP_GRANULARITY)
 {
 	int mod;
+	int i;
 
 	mod = numElements % granularity;
 	if (numElements > 0 && !mod) {
@@ -142,8 +144,42 @@ inline eHeap<type, lambdaCompare>::eHeap(lambdaCompare & compare, const type * d
 		return;
 	}
 	heap = new type[heapSize];
-	memcpy(heap, data, numElements * sizeof(data[0]));
-	memset(heap + numElements, 0, (heapSize - numElements) * sizeof(data[0]));
+	for (i = 0; i < numElements; i++)
+		heap[i] = data[i];
+
+	Heapify();
+}
+
+//***************
+// eHeap::eHeap
+// heapify move constructor
+// only works on contiguous memory
+//***************
+template<class type, class lambdaCompare>
+inline eHeap<type, lambdaCompare>::eHeap(lambdaCompare & compare, type * data, const int numElements)
+	: compare(compare),
+	numElements(numElements),
+	granularity(DEFAULT_HEAP_GRANULARITY)
+{
+	int mod;
+	int i;
+
+	mod = numElements % granularity;
+	if (numElements > 0 && !mod) {
+		heapSize = numElements;
+	}
+	else {
+		heapSize = numElements + granularity - mod;
+	}
+
+	if (data == nullptr) {
+		heap = nullptr;
+		return;
+	}
+	heap = new type[heapSize];
+	for (i = 0; i < numElements; i++)
+		heap[i] = std::move(data[i]);
+
 	Heapify();
 }
 
@@ -156,10 +192,12 @@ inline eHeap<type, lambdaCompare>::eHeap(const eHeap<type, lambdaCompare> & othe
 	: compare(other.compare),
 	  numElements(other.numElements),
 	  granularity(other.granularity),
-	  heapSize(other.heapSize) 
+	  heapSize(other.heapSize)
 {
+	int i;
 	heap = new type[heapSize];
-	memcpy(heap, other.heap, other.heapSize * sizeof(other.heap[0]));
+	for (i = 0; i < heapSize; i++)
+		heap[i] = other.heap[i];
 }
 
 //***************
@@ -190,12 +228,13 @@ inline eHeap<type, lambdaCompare>::~eHeap() {
 
 //***************
 // eHeap::operator+
-// merge, preserves originals
+// merge, copies originals
 // DEBUG: cannot be const function because the invoked heapify copy constructor is not const
 //****************
 template<class type, class lambdaCompare>
 inline eHeap<type, lambdaCompare> eHeap<type, lambdaCompare>::operator+(const eHeap<type, lambdaCompare> & other) {
 	int sumElements; 
+	int i, j;
 	type * newData; 
 
 	sumElements = numElements + other.numElements;
@@ -203,20 +242,54 @@ inline eHeap<type, lambdaCompare> eHeap<type, lambdaCompare>::operator+(const eH
 		return eHeap<type, decltype(compare)>(compare);
 
 	newData = new type[sumElements];
-	if (heap != nullptr)
-		memcpy(newData, heap, numElements * sizeof(heap[0]));
-	if (other.heap != nullptr)
-		memcpy(newData + numElements, other.heap, other.numElements * sizeof(other.heap[0]));
+	if (heap != nullptr) {
+		for (i = 0; i < numElements; i++)
+			newData[i] = heap[i];
+	}
+	if (other.heap != nullptr) {
+		for (/*i == numElements,*/ j = 0; j < other.numElements; i++, j++)
+			newData[i] = other.heap[j];
+	}
+
+	return eHeap<type, lambdaCompare>(compare, newData, sumElements);
+}
+
+//***************
+// eHeap::operator+
+// merge, moves from originals
+// DEBUG: cannot be const function because the invoked heapify move constructor is not const
+//****************
+template<class type, class lambdaCompare>
+inline eHeap<type, lambdaCompare> eHeap<type, lambdaCompare>::operator+(eHeap<type, lambdaCompare> && other) {
+	int sumElements;
+	int i, j;
+	type * newData;
+
+	sumElements = numElements + other.numElements;
+	if (!sumElements)
+		return eHeap<type, decltype(compare)>(compare);
+
+	newData = new type[sumElements];
+	if (heap != nullptr) {
+		for (i = 0; i < numElements; i++)
+			newData[i] = std::move(heap[i]);
+	}
+	if (other.heap != nullptr) {
+		for (/*i == numElements,*/ j = 0; j < other.numElements; i++, j++)
+			newData[i] = std::move(other.heap[j]);
+	}
 
 	return eHeap<type, lambdaCompare>(compare, newData, sumElements);
 }
 
 //***************
 // eHeap::operator+=
-// meld, preserves source
+// meld, moves from source
 //***************
 template<class type, class lambdaCompare>
-inline eHeap<type, lambdaCompare> & eHeap<type, lambdaCompare>::operator+=(eHeap<type, lambdaCompare> other) {
+inline eHeap<type, lambdaCompare> & eHeap<type, lambdaCompare>::operator+=(eHeap<type, lambdaCompare> && other) {
+	int i;
+
 	if (other.heap == nullptr)
 		return *this;
 
@@ -225,7 +298,35 @@ inline eHeap<type, lambdaCompare> & eHeap<type, lambdaCompare>::operator+=(eHeap
 	} else if (numElements + other.numElements > heapSize) {
 		Resize(heapSize + other.numElements);
 	}
-	memcpy(heap + numElements, other.heap, other.numElements * sizeof(other.heap[0]));
+
+	for (i = 0; i < other.numElements; i++)
+		heap[i + numElements] = std::move(other.heap[i]);
+
+	numElements += other.numElements;
+	Heapify();
+	return *this;
+}
+
+//***************
+// eHeap::operator+=
+// meld, preserves source
+//***************
+template<class type, class lambdaCompare>
+inline eHeap<type, lambdaCompare> & eHeap<type, lambdaCompare>::operator+=(const eHeap<type, lambdaCompare> & other) {
+	int i;
+
+	if (other.heap == nullptr)
+		return *this;
+
+	if (heap == nullptr) {
+		Allocate(other.heapSize);
+	} else if (numElements + other.numElements > heapSize) {
+		Resize(heapSize + other.numElements);
+	}
+
+	for (i = 0; i < other.numElements; i++)
+		heap[i + numElements] = other.heap[i];
+
 	numElements += other.numElements;
 	Heapify();
 	return *this;
@@ -306,7 +407,7 @@ inline void eHeap<type, lambdaCompare>::PopRoot() {
 		return;
 	}
 	numElements--;
-	heap[0] = heap[numElements];
+	std::swap(heap[0], heap[numElements]);
 	SiftDown(0);
 }
 
@@ -508,7 +609,7 @@ inline void eHeap<type, lambdaCompare>::Allocate(const int newHeapSize) {
 	Free();
 	heapSize = newHeapSize;
 	heap = new type[heapSize];					
-	memset(heap, 0, heapSize * sizeof(heap[0]));
+	memset(heap, 0, heapSize * sizeof(type));
 }
 
 //***************
@@ -517,7 +618,7 @@ inline void eHeap<type, lambdaCompare>::Allocate(const int newHeapSize) {
 //**************
 template<class type, class lambdaCompare>
 inline size_t eHeap<type, lambdaCompare>::Allocated() const {
-	return heap == nullptr * heapSize * sizeof(heap[0]);
+	return heap == nullptr * heapSize * sizeof(type);
 }
 
 //***************
@@ -550,7 +651,9 @@ inline void eHeap<type, lambdaCompare>::Free() {
 template<class type, class lambdaCompare>
 inline void eHeap<type, lambdaCompare>::Resize(const int newHeapSize) {
 	type * oldHeap;
-	int mod, newSize;
+	int mod;
+	int newSize;
+	int i;
 
 	if (newHeapSize <= heapSize)
 		return;
@@ -568,22 +671,26 @@ inline void eHeap<type, lambdaCompare>::Resize(const int newHeapSize) {
 
 	oldHeap = heap;
 	heap = new type[newSize];
-	memcpy(heap, oldHeap, heapSize * sizeof(type));
-	memset(heap + heapSize, 0, (newSize - heapSize) * sizeof(type));
+	for (i = 0; i < heapSize; i++)
+		heap[i] = std::move(oldHeap[i]);
+
 	delete[] oldHeap;
 	heapSize = newSize;
 }
 
 //***************
 // eHeap::Clear
-// reset all data and retain allocated memory
+// reset numElements retain allocated memory to be overwritten
 //**************
 template<class type, class lambdaCompare>
 inline void eHeap<type, lambdaCompare>::Clear() {
-	if (heap != nullptr) {
-		memset(heap, 0, heapSize * sizeof(heap[0]));
+	// DEBUG: memsetting the contents of a 
+	// std::unique_ptr or std::string will cause a leak
+	// because its destructor cannot deallocate its original pointer
+//	if (heap != nullptr) {
+//		memset(heap, 0, heapSize * sizeof(type));
 		numElements = 0;
-	}
+//	}
 }
 
 //***************
