@@ -1,0 +1,16 @@
+UnityMetas/sHero_Run_0.png.meta
+UnityMetas/sHero_Run_1.png.meta
+UnityMetas/sHero_Run_2.png.meta
+UnityMetas/sHero_Run_3.png.meta
+UnityMetas/sHero_Run_4.png.meta
+UnityMetas/sHero_Run_5.png.meta
+UnityMetas/sHero_Run_6.png.meta
+UnityMetas/sHero_Run_7.png.meta
+UnityMetas/sHero_Run_8.png.meta
+UnityMetas/sHero_Run_9.png.meta
+UnityMetas/sHero_Run_10.png.meta
+UnityMetas/sHero_Run_11.png.meta
+UnityMetas/sHero_Run_12.png.meta
+UnityMetas/sHero_Run_13.png.meta
+UnityMetas/sHero_Run_14.png.meta
+UnityMetas/sHero_Run_15.png.meta
