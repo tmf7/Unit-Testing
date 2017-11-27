@@ -86,5 +86,6 @@ int main() {
 		currentWrite.close();
 		currentRead.close();
 	}
+	masterRead.close();
 	return 0;
 }
