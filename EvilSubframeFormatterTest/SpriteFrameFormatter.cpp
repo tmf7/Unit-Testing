@@ -3,10 +3,15 @@
 
 //*************************
 // SpriteFrameFormatter
-// Reads a Unity image.meta file thats formatted
-// for a spritesheet thats been split into subframes
-// and generates a image subframe file consumable
+// Reads a Unity sprite/UI multi-type image.meta file
+// that's been split into subframes
+// and outputs a image subframe file consumable
 // by the EngineOfEvil
+// [output ".sub" file format] imageFilename\n
+// numSubframes\n
+// x y width height\t\t# 0\n	(clip-rectangle relative to top-left of image file; text beyond # will be ignored comment area in EngineOfEvil)
+// x1 y1 width1 height1\t\t# 1\n
+// (repeat)
 //*************************
 int main() {
 	const auto noMatch = std::sregex_iterator();
