@@ -28,6 +28,9 @@ int main() {
 		// get a file to read
 		memset(metaFilenameBuffer, 0, sizeof(metaFilenameBuffer));
 		masterRead.getline(metaFilenameBuffer, std::numeric_limits<std::streamsize>::max(), '\n');	// eg: "UnityMetas/sHero_Run_0.png.meta"
+		std::ifstream currentRead(metaFilenameBuffer, std::ios_base::in);
+		if (currentRead.bad() || currentRead.fail())						// unable to find meta file to read, skip it
+			continue;
 
 		// name to be added to top of output file contents (eg: sHero_Run_0.png)
 		// regex for everything between the last '/' and last '.'
@@ -41,15 +44,15 @@ int main() {
 		// output file creation in graphics pre-existing directory within the executable directory
 		std::string subframesFilename("EngineOutputs/");
 		subframesFilename += imageFilename.substr(0, imageFilename.rfind('.'));
-		subframesFilename += ".sub";
+		subframesFilename += ".eimg";
 
 		std::ofstream currentWrite(subframesFilename, std::ios_base::out);
-		currentWrite << "Graphics/Animations/" << imageFilename.c_str() << '\n';
+		currentWrite << "Graphics/Animations/sHero/sHero_Idle/Textures/Image_defs/" << imageFilename.c_str() << '\n';
+		currentWrite << "0 ";												// default texture type access to SDL_TEXTUREACCESS_STATIC
 		auto subframeCountPosition = currentWrite.tellp();					// return here later to insert the subframesCount
 		currentWrite << "\n\n";												// DEBUG: second newline will be overwritten by subframesCount
 
 		// find an instance of "x:", then set the frame position and size		
-		std::ifstream currentRead(metaFilenameBuffer, std::ios_base::in);
 		int subframesCount = 0;
 		while (!currentRead.eof()) {
 
