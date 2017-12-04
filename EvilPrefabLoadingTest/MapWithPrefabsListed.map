@@ -1,0 +1,12 @@
+Hero{
+xposition: 26
+yposition: 32
+behavior: behavior2
+}
+# skip these
+# comments
+Hero{
+xposition: 11
+yposition: 99
+behavior: behavior1
+}
