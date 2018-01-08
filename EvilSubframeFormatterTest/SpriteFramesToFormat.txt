@@ -1,3 +1,4 @@
+UnityMetas/sHero_Idle_All.png.meta
 UnityMetas/sHero_Run_0.png.meta
 UnityMetas/sHero_Run_1.png.meta
 UnityMetas/sHero_Run_2.png.meta

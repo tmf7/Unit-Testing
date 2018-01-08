@@ -47,13 +47,16 @@ int main() {
 		subframesFilename += ".eimg";
 
 		std::ofstream currentWrite(subframesFilename, std::ios_base::out);
-		currentWrite << "Graphics/Animations/sHero/sHero_Idle/Textures/Image_defs/" << imageFilename.c_str() << '\n';
+		currentWrite << "Graphics/Textures/" << imageFilename.c_str() << '\n';
 		currentWrite << "0 ";												// default texture type access to SDL_TEXTUREACCESS_STATIC
 		auto subframeCountPosition = currentWrite.tellp();					// return here later to insert the subframesCount
 		currentWrite << "\n\n";												// DEBUG: second newline will be overwritten by subframesCount
 
-		// find an instance of "x:", then set the frame position and size		
+		int imageHeight = 0;
 		int subframesCount = 0;
+
+		currentRead >> imageHeight;											// Unity .meta file manually modified to have imageHeight as first entry (because the .meta doesn't contain the true image height)
+
 		while (!currentRead.eof()) {
 
 			// search for an instance of "rect:"
@@ -85,12 +88,16 @@ int main() {
 			currentRead.ignore(std::numeric_limits<std::streamsize>::max(), ':');
 			currentRead >> frameHeight;
 
+			frameY = imageHeight - (frameHeight + frameY);			// convert bottom-left Unity rect origins to top-left Engine-of-Evil rect origins
+
 			// output
 			currentWrite << frameX << ' ' << frameY << ' ' << frameWidth << ' ' << frameHeight << "\t\t# " << subframesCount << '\n';
 			++subframesCount;
 		}
 		currentWrite.seekp(subframeCountPosition);
 		currentWrite << subframesCount << '\n';
+		currentWrite.seekp(-1, std::ios::end);
+		currentWrite << " eof";
 		currentWrite.close();
 		currentRead.close();
 	}
