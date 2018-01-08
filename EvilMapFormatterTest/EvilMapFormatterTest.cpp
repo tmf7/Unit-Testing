@@ -71,14 +71,14 @@ bool ReadUpdateRanges(const char * rangesFilename, std::vector<std::array<int, 3
 // UpdateMapFile
 // Updates the .tmx output file from Tiled map editor to .map format
 // for consumption by the Engine-of-Evil
-// DEBUG (.map file format **output**):
+// DEBUG (.emapx file format **output**):
 // master-tileSet-index, master-tileSet-index, ... master-tileSet-index\n
 // # end of layer 1 comment\n
 // master-tileSet-index, master-tileSet-index, ... master-tileSet-index\n
 // # end of layer 2 comment\n
 // (repeat, note that 0 as a master-tileSet-index indicates a placeholder, ie a tileMap index to skip for that layer)
 // (and therefore ALL values should be reduced by 1 before setting an eTileImpl::type
-// DEBUG: .map file format **input** is nearly identical to the **output** format
+// DEBUG: .emap file format **input** is nearly identical to the **output** format
 // except the input has a ',' before each '\n' (except the very last int for a layer)
 //**************
 bool UpdateMapFile(const char * mapFilename, const char * rangesFilename) {
@@ -146,7 +146,7 @@ bool UpdateMapFile(const char * mapFilename, const char * rangesFilename) {
 // main
 //*****************
 int main(const char * argc) {
-	if (!UpdateMapFile("MapsToFormat/EvilTown_u.map", "MapsToFormat/EvilTown.rng"))
+	if (!UpdateMapFile("MapsToFormat/EvilTown2_u.emap", "MapsToFormat/EvilTown2.rng"))
 		return 1;
 	return 0;
 }
